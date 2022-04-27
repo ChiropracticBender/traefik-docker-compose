@@ -1,0 +1,56 @@
+version: "3"
+
+services:
+  traefik:
+    image: traefik:latest
+    restart: unless-stopped
+    container_name: ${TRAEFIK_NAME}
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    networks:
+      - ${EXTERNAL_NETWORK}
+    ports:
+      - 80:80
+      - 443:443
+    volumes:
+      - /etc/localtime:/etc/localtime:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - ./traefik-data/traefik.yml:/traefik.yml:ro
+      - ./traefik-data/acme.json:/acme.json
+      - ./traefik-data/configurations:/configurations
+    labels:
+    ## CONFIG FILE MIGRATION IN PROGRESS -- NOT COMPLETED
+      # - "--api.dashboard=true"
+      # - "--entryPoints.web.address=:80"
+      - "traefik.enable=true"
+      - "traefik.docker.network=proxy"
+      - "traefik.http.routers.${TRAEFIK_NAME}-secure.entrypoints=websecure"
+      - "traefik.http.routers.${TRAEFIK_NAME}-secure.rule=Host(`${TRAEFIK_SUBDOMAIN}.${DOMAIN}`)"
+      - "traefik.http.routers.${TRAEFIK_NAME}-secure.middlewares=user-auth@file"
+      - "traefik.http.routers.${TRAEFIK_NAME}-secure.service=api@internal"
+
+  portainer:
+    image: portainer/portainer-ce:latest
+    restart: unless-stopped
+    container_name: ${PORTAINER_NAME}
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    networks:
+      - ${EXTERNAL_NETWORK}
+    volumes:
+      - /etc/localtime:/etc/localtime:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - ./portainer-data:/data
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=proxy"
+      - "traefik.http.routers.${PORTAINER_NAME}-secure.entrypoints=websecure"
+      - "traefik.http.routers.${PORTAINER_NAME}-secure.rule=Host(`{PORTAINER_SUBDOMAIN}.${DOMAIN}`)"
+      - "traefik.http.routers.${PORTAINER_NAME}-secure.service=${PORTAINER_NAME}"
+      - "traefik.http.services.${PORTAINER_NAME}.loadbalancer.server.port=9000"
+
+networks:
+  ${EXTERNAL_NETWORK}:
+    external: true
